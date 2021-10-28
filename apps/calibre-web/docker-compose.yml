@@ -1,0 +1,31 @@
+---
+version: "2.1"
+services:
+  calibre-web:
+    image: lscr.io/linuxserver/calibre-web
+    container_name: calibre-web
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Asia/Kolkata
+    volumes:
+      - /home/ubuntu/storage-drive/calibre/calibre-web-data:/config
+      - /home/ubuntu/storage-drive/calibre/calibre-library:/books
+    ports:
+      - 8083:8083
+    restart: unless-stopped
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      - "traefik.http.routers.calibre-web-secure.entrypoints=websecure"
+      - "traefik.http.routers.calibre-web-secure.middlewares=secureHeaders@file"
+      - "traefik.http.routers.calibre-web-secure.tls=true"
+      - "traefik.http.routers.calibre-web-secure.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.calibre-web-secure.rule=Host(`calibrew.r18i.me`)"
+    networks:
+      - proxy
+      - default
+
+networks:
+  proxy:
+    external: true

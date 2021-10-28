@@ -1,0 +1,69 @@
+version: '3'
+
+networks:
+  proxy:
+    external: true
+
+services:
+
+  nextcloud:
+    restart: always
+    image: nextcloud
+    container_name: nextcloud
+    environment:
+      # Hook Nextcloud up with MySQL 
+      NEXTCLOUD_DB_HOST: mariadb:3306
+      NEXTCLOUD_DB_USER: nextclouduser
+      NEXTCLOUD_DB_PASSWORD: // add password
+      NEXTCLOUD_DB_NAME: nextclouddb
+    volumes:
+      # Store the contents of Nextcloud and enable local modifications
+      - /home/ubuntu/storage-drive/nextcloud/html:/var/www/html    
+    networks:
+      - default
+      - proxy
+    depends_on:
+        - mariadb
+    ports:
+      - "3304:3000"
+    labels:
+      # Connect to Traefik
+      - "traefik.enable=true"
+      - "traefik.docker.network=proxy"
+      # Middlewares Caldav
+      - "traefik.http.middlewares.nextcloud-caldav.redirectregex.permanent=true"
+      - "traefik.http.middlewares.nextcloud-caldav.redirectregex.regex=^https://(.*)/.well-known/(card|cal)dav"
+      - "traefik.http.middlewares.nextcloud-caldav.redirectregex.replacement=https://$${1}/remote.php/dav/"
+      # Connect Middleware Caldav with Nextcloud-router
+      - "traefik.http.routers.nextcloud-secure.middlewares=nextcloud-caldav@docker"
+      # Route HTTPS
+      - "traefik.http.routers.nextcloud-secure.entrypoints=websecure"
+      - "traefik.http.routers.nextcloud-secure.rule=Host(`nextcloud.r18i.me`)"
+      # Enable TLS
+      - "traefik.http.routers.nextcloud-secure.tls=true"
+      # Enable Let's Encrypt HTTP challenge
+     # - "traefik.http.routers.traefik-secure-secured.tls.certresolver=letsencrypthttpchallenge"
+      # Enable HSTS Headers and other security headers
+     # - "traefik.http.routers.nextcloud-secure.middlewares=secureHeaders@file"
+      
+
+  mariadb:
+    # The database Nextcloud will connect to
+    image: mariadb:10.5
+    restart: always
+    container_name: mariadb-nextcloud
+    ports:
+      - "3306:3306"
+    environment:
+    # Nextcloud Database entries
+      MYSQL_DATABASE: nextclouddb
+      MYSQL_USER: nextclouduser
+      MYSQL_PASSWORD: // add password
+      MYSQL_RANDOM_ROOT_PASSWORD: '1'
+    volumes:
+      # The database will also be stored in ./db on your local machine and container itself
+      - /home/ubuntu/storage-drive/nextcloud/mysql/db:/var/lib/mysql
+    networks:
+      # The Traefik network is not needed here
+      - default
+      - proxy
